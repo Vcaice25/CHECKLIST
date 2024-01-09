@@ -1,48 +1,55 @@
-# Libreria para rel uso de Flask
-from flask import Flask, render_template, request
-
-# Librerias para el uso de la base de datos
+from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped, mapped_column
+
+app = Flask(__name__)
 
 
-app = Flask (__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///todo.sqlite"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
 
-#Configuro parametro SQLALCHEMY_DATABASE_URI con la ubicacion de la bd
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///todo.squite"
 
-db = SQLAlchemy (app)
-
-# Crear la Tabla
 class Todo(db.Model):
-    id:Mapped[int] = mapped_column(db.Integer, primary_key=True,autoincrement=True)
-    name:Mapped[str]= mapped_column(db.String,nullable=False)
-    state:Mapped[str] = mapped_column(db.Float,nullable=False,default= 'Incompleto')
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=False)
+    state = db.Column(db.String, nullable=False, default='Incompleto')
 
-#Crear la base y las tablas necesarias con el contexto de la aplicacion
-with app. app_context():
-    db. create_all()
 
-#Rutas de la aplicacion
-@app.route( "/", methods=['GET','POST'])
+with app.app_context():
+    db.create_all()
+
+
+@app.route("/", methods=['GET', 'POST'])
 def home():
-      if request.method == 'POST':
-           return f' quieres agregar algo?'
+    if request.method == 'POST':
+        nueva_tarea_nombre = request.form.get('name')
+        nueva_tarea = Todo(name=nueva_tarea_nombre)
+        db.session.add(nueva_tarea)
+        db.session.commit()
 
-@app.route("/insert")
-def insert():
-       return f'PRUEBA CKECK LIST'
+    lista_tareas = Todo.query.all()
+
+    return render_template('select.html', lista_tareas=lista_tareas)
 
 @app.route("/update/<id>")
 def update(id):
-       return f'PRUEBA CKECK LIST MODIFICAR EL ID {id}'
+    tarea = Todo.query.get(id)
+    if tarea:
+        tarea.state = 'Completo' if tarea.state == 'Incompleto' else 'Incompleto'
+        db.session.commit()
+    return redirect(url_for('home'))
 
 @app.route("/delete/<id>")
 def delete(id):
-       return f'PRUEBA CKECK LIST ELIMINAR EL ID {id}'
+    tarea = Todo.query.get(id)
+    if tarea:
+        db.session.delete(tarea)
+        db.session.commit()
+    return redirect(url_for('home'))
 
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db.session.remove()
 
-  
 if __name__ == '__main__':
-      app.run(debug=True)
+    app.run(debug=True)
